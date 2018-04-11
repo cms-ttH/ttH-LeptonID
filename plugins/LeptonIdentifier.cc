@@ -148,14 +148,14 @@ LeptonIdentifier::LeptonIdentifier(const edm::ParameterSet &config)
    vtx_token_ = consumes<reco::VertexCollection>(edm::InputTag("offlineSlimmedPrimaryVertices"));
 
    mvaValuesHZZMapToken_ =
-      consumes<edm::ValueMap<float>>(edm::InputTag("electronMVAValueMapProducer:ElectronMVAEstimatorRun2Spring16HZZV1Values"));
+      consumes<edm::ValueMap<float>>(edm::InputTag("electronMVAValueMapProducer:ElectronMVAEstimatorRun2Fall17NoIsoV1Values"));
    mvaCategoriesHZZMapToken_ =
-      consumes<edm::ValueMap<int>>(edm::InputTag("electronMVAValueMapProducer:ElectronMVAEstimatorRun2Spring16HZZV1Categories"));
+      consumes<edm::ValueMap<int>>(edm::InputTag("electronMVAValueMapProducer:ElectronMVAEstimatorRun2Fall17NoIsoV1Categories"));
 
    mvaValuesGPMapToken_ =
-      consumes<edm::ValueMap<float>>(edm::InputTag("electronMVAValueMapProducer:ElectronMVAEstimatorRun2Spring16GeneralPurposeV1Values"));
+      consumes<edm::ValueMap<float>>(edm::InputTag("electronMVAValueMapProducer:ElectronMVAEstimatorRun2Spring16GeneralPurposeV1Values")); // probably replace eventually with 2017 "iso" version
    mvaCategoriesGPMapToken_ =
-      consumes<edm::ValueMap<int>>(edm::InputTag("electronMVAValueMapProducer:ElectronMVAEstimatorRun2Spring16GeneralPurposeV1Categories"));
+      consumes<edm::ValueMap<int>>(edm::InputTag("electronMVAValueMapProducer:ElectronMVAEstimatorRun2Spring16GeneralPurposeV1Categories")); // probably replace eventually with 2017 "iso" version
 
    // Who gives a FUCK about these parameters?  They are not used in the
    // methods we access, which could be spun off, anyways.
@@ -173,20 +173,21 @@ LeptonIdentifier::LeptonIdentifier(const edm::ParameterSet &config)
       m->AddVariable("LepGood_miniRelIsoCharged", &varchRelIso);
       m->AddVariable("LepGood_miniRelIsoNeutral", &varneuRelIso);
       m->AddVariable("LepGood_jetPtRelv2", &varjetPtRel_in);
-      m->AddVariable("LepGood_jetPtRatio := min(LepGood_jetPtRatiov2,1.5)", &varjetPtRatio_in);
-      m->AddVariable("LepGood_jetBTagCSV := max(LepGood_jetBTagCSV,0)", &varjetBTagCSV_in);
+      //m->AddVariable("LepGood_jetPtRatio := min(LepGood_jetPtRatiov2,1.5)", &varjetPtRatio_in);
+      m->AddVariable("LepGood_jetBTagCSV := max(LepGood_jetBTagCSV,0)", &varjetBTagCSV_in);      
+      m->AddVariable("LepGood_jetPtRatiov2 := (LepGood_jetBTagCSV>-5)*min(LepGood_jetPtRatiov2,1.5)+(LepGood_jetBTagCSV<-5)/(1+LepGood_relIso04)", &varjetPtRatio_in);
       m->AddVariable("LepGood_sip3d", &varsip3d);
       m->AddVariable("LepGood_dxy := log(abs(LepGood_dxy))", &vardxy);
       m->AddVariable("LepGood_dz := log(abs(LepGood_dz))", &vardz);
    }
 
-   ele_reader_->AddVariable("LepGood_mvaIdSpring16HZZ", &varmvaId);
+   ele_reader_->AddVariable("LepGood_mvaIdFall17noIso", &varmvaId);
    mu_reader_->AddVariable("LepGood_segmentCompatibility", &varSegCompat);
 
    const std::string base = std::string(getenv("CMSSW_BASE")) + "/src/ttH/LeptonID/data";
 
-   mu_reader_->BookMVA("BDTG method", base + "/mu_BDTG.weights.xml");
-   ele_reader_->BookMVA("BDTG method", base + "/el_BDTG.weights.xml");
+   mu_reader_->BookMVA("BDTG method", base + "/lepMVA_2017_mu_BDTG_weights.xml");
+   ele_reader_->BookMVA("BDTG method", base + "/lepMVA_2017_el_BDTG_weights.xml");
 }
 
 LeptonIdentifier::~LeptonIdentifier()
@@ -297,7 +298,7 @@ LeptonIdentifier::passes(const pat::Muon &mu, ID id)
          passesID = passesPreselection and
             mu.userFloat("leptonMVA") > 0.90 and
             mu.userFloat("nearestJetCsv") < medium_csv_wp and
-            mu.userFloat("isMediumMuon");
+            mu.userFloat("isMediumMuon"); // jetCSV < 0.8484 ? yes (see osTwoLep_cfg.py)
             //isMediumMuon(mu, hip_safe_);
          break;    
       case tight:            
@@ -420,7 +421,7 @@ LeptonIdentifier::passes(const pat::Electron &ele, ID id)
          passesID = passesPreselection and
                     passesCuts and
                     ele.userFloat("leptonMVA") > 0.90 and
-                    ele.userFloat("nearestJetCsv") < medium_csv_wp;
+                    ele.userFloat("nearestJetCsv") < medium_csv_wp; // jetCSV < 0.8484
          break;
       case tight:
          passesIso = ele.userFloat("miniIso") < 0.25;
@@ -469,8 +470,7 @@ LeptonIdentifier::passes(const pat::Tau &tau, ID id)
    return (passesKinematics && passesIso && passesID);
 }
 
-template<typename T> void
-LeptonIdentifier::addCommonUserFloats(T& lepton)
+template<typename T> void LeptonIdentifier::addCommonUserFloats(T& lepton)
 {
    double corr_factor = 1.;
    double L1_SF = 1.;
@@ -497,7 +497,8 @@ LeptonIdentifier::addCommonUserFloats(T& lepton)
    lepton.addUserFloat("nearestJetDr", min(dR, 0.5)); // no longer used in MVA
 
    float njet_csv = 0;
-   float njet_pt_ratio = 1.;
+   //float njet_pt_ratio = 1.;
+   float njet_pt_ratio = 1./(1. + lepton.userFloat("relIsoR04"));
    float njet_pt_rel = 0.;
    float njet_ndau_charged = 0.;
 
@@ -674,6 +675,7 @@ LeptonIdentifier::produce(edm::Event &event, const edm::EventSetup &setup)
       std::map<std::string, double> miniIso_calculation_params;
 
       mu.addUserFloat("relIso", helper_.GetMuonRelIso(mu, coneSize::R03, corrType::rhoEA));
+      mu.addUserFloat("relIsoR04", helper_.GetMuonRelIso(mu, coneSize::R04, corrType::deltaBeta));
       mu.addUserFloat("miniIso", helper_.GetMuonRelIso(mu, coneSize::miniIso, corrType::rhoEA, &miniIso_calculation_params));
       mu.addUserFloat("miniAbsIsoCharged", miniIso_calculation_params["miniAbsIsoCharged"]);
       mu.addUserFloat("miniAbsIsoNeutral", miniIso_calculation_params["miniAbsIsoNeutral"]);
@@ -706,9 +708,9 @@ LeptonIdentifier::produce(edm::Event &event, const edm::EventSetup &setup)
       std::map<std::string, double> miniIso_calculation_params;
 
       ele.addUserFloat("superClusterEta", abs(ele.superCluster()->position().eta()));
-      ele.addUserFloat("relIso", helper_.GetElectronRelIso(ele, coneSize::R03, corrType::rhoEA));
-      ele.addUserFloat("miniIso",
-                       helper_.GetElectronRelIso(ele, coneSize::miniIso, corrType::rhoEA, effAreaType::spring15, &miniIso_calculation_params));
+      ele.addUserFloat("relIso", helper_.GetElectronRelIso(ele, coneSize::R03, corrType::rhoEA, effAreaType::fall17));
+      ele.addUserFloat("relIsoR04", helper_.GetElectronRelIso(ele, coneSize::R04, corrType::rhoEA, effAreaType::fall17));
+      ele.addUserFloat("miniIso", helper_.GetElectronRelIso(ele, coneSize::miniIso, corrType::rhoEA, effAreaType::fall17, &miniIso_calculation_params));
       ele.addUserFloat("miniAbsIsoCharged", miniIso_calculation_params["miniAbsIsoCharged"]);
       ele.addUserFloat("miniAbsIsoNeutral", miniIso_calculation_params["miniAbsIsoNeutral"]);
       ele.addUserFloat("rho", miniIso_calculation_params["rho"]);
