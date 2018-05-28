@@ -292,10 +292,10 @@ LeptonIdentifier::passes(const pat::Muon &mu, ID id)
          }
          break;
       case mvabased:
-         passesIso = true;
          passesID = passesPreselection and
             mu.userFloat("leptonMVA") > 0.90 and
-            mu.userFloat("nearestJetCsv") < medium_csv_wp and
+            //mu.userFloat("nearestJetCsv") < medium_csv_wp and           // <---- 
+            mu.userFloat("nearestJetDeepCsv") < 0.4941 and
             mu.userFloat("isMediumMuon"); // jetCSV < 0.8484 ? yes (see osTwoLep_cfg.py)
             //isMediumMuon(mu, hip_safe_);
          break;    
@@ -398,7 +398,7 @@ LeptonIdentifier::passes(const pat::Electron &ele, ID id)
    bool passesID = false;
    bool passesJetCSV = false;
 
-   bool passesObjectSelection = true;
+   bool passesObjectSelection = true;  /// <<< ------  ??????????????????
 
    switch (id) {
       case preselection:
@@ -419,7 +419,8 @@ LeptonIdentifier::passes(const pat::Electron &ele, ID id)
          passesID = passesPreselection and
                     passesCuts and
                     ele.userFloat("leptonMVA") > 0.90 and
-                    ele.userFloat("nearestJetCsv") < medium_csv_wp; // jetCSV < 0.8484
+                    //ele.userFloat("nearestJetCsv") < medium_csv_wp; // jetCSV < 0.8484
+                    ele.userFloat("nearestJetDeepCsv") < 0.4941;
          break;
       case tight:
          passesIso = ele.userFloat("miniIso") < 0.25;
@@ -494,7 +495,8 @@ template<typename T> void LeptonIdentifier::addCommonUserFloats(T& lepton)
 
    lepton.addUserFloat("nearestJetDr", min(dR, 0.5)); // no longer used in MVA
 
-   float njet_csv = 0;
+   float njet_csv = 0.;
+   float njet_deepcsv = 0.;
    //float njet_pt_ratio = 1.;
    float njet_pt_ratio = 1./(1. + lepton.userFloat("relIsoR04"));
    float njet_pt_rel = 0.;
@@ -502,6 +504,7 @@ template<typename T> void LeptonIdentifier::addCommonUserFloats(T& lepton)
 
    if (jets_.size() > 0 and dR < .4) {
       njet_csv = matchedJet.bDiscriminator("pfCombinedInclusiveSecondaryVertexV2BJetTags");
+      njet_deepcsv = matchedJet.bDiscriminator("pfDeepCSVJetTags:probb")+matchedJet.bDiscriminator("pfDeepCSVJetTags:probbb");
       if (njet_csv < 0)
          njet_csv = -10.;
 
@@ -544,6 +547,7 @@ template<typename T> void LeptonIdentifier::addCommonUserFloats(T& lepton)
    }
 
    lepton.addUserFloat("nearestJetCsv", njet_csv);
+   lepton.addUserFloat("nearestJetDeepCsv", njet_deepcsv);
    lepton.addUserFloat("nearestJetPtRatio", njet_pt_ratio);
    lepton.addUserFloat("nearestJetPtRel", njet_pt_rel);
    lepton.addUserFloat("nearestJetNDauCharged", njet_ndau_charged);
