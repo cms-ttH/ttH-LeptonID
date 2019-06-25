@@ -643,7 +643,8 @@ LeptonIdentifier::produce(edm::Event &event, const edm::EventSetup &setup)
    //auto input_ele = helper_.GetElectronsWithMVAid(input_ele_raw, mvaValuesGP, mvaCategoriesGP);
    auto input_ele = helper_.GetElectronsWithMVAid(input_ele_raw, mvaValuesHZZ, mvaCategoriesHZZ);
 
-   jets_ = helper_.GetSelectedJets(*input_jet, -666., 666., jetID::none, '-'); // already corrected (?)
+   //jets_ = helper_.GetSelectedJets(*input_jet, -666., 666., jetID::none, '-'); // already corrected (?)
+   jets_ = helper_.GetSelectedJets(*input_jet, 15., 666., jetID::none, '-'); // already corrected (?)
 
    for (auto mu : *input_mu) {
       if (mu.pt() < mu_minpt_)
